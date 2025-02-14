@@ -1,0 +1,39 @@
+name: Test rest-s3-tpcds
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start services
+        working-directory: rest-s3-tpcds
+        run: docker compose up -d minio mc rest # Start dependencies
+
+      - name: Run spark container and capture exit code
+        id: spark-run
+        working-directory: rest-s3-tpcds
+        run: |
+          # Run in foreground and capture exit code
+          docker compose up --exit-code-from spark-iceberg spark-iceberg
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Verify spark exit code
+        if: steps.spark-run.outputs.exit_code != 0
+        working-directory: rest-s3-tpcds
+        run: |
+          echo "❌ Spark container exited with code ${{ steps.spark-run.outputs.exit_code }}"
+          docker compose logs spark-iceberg  # Show logs for debugging
+          exit 1
