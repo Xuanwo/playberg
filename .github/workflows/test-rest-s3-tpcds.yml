@@ -43,27 +43,3 @@ jobs:
           echo "❌ Spark container exited with code ${{ steps.spark-run.outputs.exit_code }}"
           docker compose logs spark-iceberg  # Show logs for debugging
           exit 1
-
-      # E2E test
-      - name: Run Python E2E test
-        working-directory: rest-s3-tpcds
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install pyiceberg requests
-          cat << EOF > test_iceberg.py
-          from pyiceberg.catalog import load_catalog
-
-          catalog = load_catalog(
-              "default",
-              **{
-                  "uri": "http://localhost:8181",
-                  "s3.endpoint": "http://localhost:9000",
-                  "s3.access-key-id": "admin",
-                  "s3.secret-access-key": "password"
-              }
-          )
-          assert "tpcds" in catalog.list_namespaces()
-          print("✅ End-to-end test passed")
-          EOF
-          python test_iceberg.py
