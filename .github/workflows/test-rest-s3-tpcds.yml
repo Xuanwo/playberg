@@ -19,12 +19,14 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Start services stack
+        working-directory: rest-s3-tpcds
         run: |
           docker compose -f docker-compose.yml up -d
           sleep 20  # Initial service initialization
 
       # Phase 1: Infrastructure validation
       - name: Verify container states
+        working-directory: rest-s3-tpcds
         run: |
           # Ignore mc container's expected exit
           docker compose ps | grep -v 'Exit 0' | grep -v 'mc'
@@ -34,6 +36,7 @@ jobs:
           fi
 
       - name: Validate MinIO health
+        working-directory: rest-s3-tpcds
         run: |
           for retry in {1..10}; do
             if curl -sI http://localhost:9000/minio/health/live | grep 200; then
@@ -47,6 +50,7 @@ jobs:
 
       # Phase 2: REST service validation
       - name: Test REST API endpoints
+        working-directory: rest-s3-tpcds
         run: |
           sudo apt-get install -y jq  # Install JSON processor
           curl -s http://localhost:8181/v1/config | jq empty
@@ -57,6 +61,7 @@ jobs:
 
       # Phase 4: E2E test
       - name: Run Python E2E test
+        working-directory: rest-s3-tpcds
         run: |
           python -m venv venv
           source venv/bin/activate
