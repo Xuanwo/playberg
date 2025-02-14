@@ -1,0 +1,79 @@
+name: Test rest-s3-tpcds
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start services stack
+        run: |
+          docker compose -f docker-compose.yml up -d
+          sleep 20  # Initial service initialization
+
+      # Phase 1: Infrastructure validation
+      - name: Verify container states
+        run: |
+          # Ignore mc container's expected exit
+          docker compose ps | grep -v 'Exit 0' | grep -v 'mc'
+          if [ $? -eq 0 ]; then
+            echo "💥 Containers exited unexpectedly"
+            exit 1
+          fi
+
+      - name: Validate MinIO health
+        run: |
+          for retry in {1..10}; do
+            if curl -sI http://localhost:9000/minio/health/live | grep 200; then
+              echo "✅ MinIO health check passed"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "❌ MinIO not ready within 30s"
+          exit 1
+
+      # Phase 2: REST service validation
+      - name: Test REST API endpoints
+        run: |
+          sudo apt-get install -y jq  # Install JSON processor
+          curl -s http://localhost:8181/v1/config | jq empty
+          curl -X POST http://localhost:8181/v1/namespaces \
+            -H "Content-Type: application/json" \
+            -d '{"namespace": ["ci_test"]}' \
+            -w "\nHTTP Status: %{http_code}\n" | grep "HTTP Status: 200"
+
+      # Phase 4: E2E test
+      - name: Run Python E2E test
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install pyiceberg requests
+          cat << EOF > test_iceberg.py
+          from pyiceberg.catalog import load_catalog
+
+          catalog = load_catalog(
+              "default",
+              **{
+                  "uri": "http://localhost:8181",
+                  "s3.endpoint": "http://localhost:9000",
+                  "s3.access-key-id": "admin",
+                  "s3.secret-access-key": "password"
+              }
+          )
+          assert "ci_test" in catalog.list_namespaces()
+          print("✅ End-to-end test passed")
+          EOF
+          python test_iceberg.py
