@@ -30,6 +30,7 @@ jobs:
 
       - name: Run spark container and capture exit code
         id: spark-run
+        working-directory: rest-s3-tpcds
         run: |
           # Run in foreground and capture exit code
           docker compose up --exit-code-from spark-iceberg spark-iceberg
@@ -37,6 +38,7 @@ jobs:
 
       - name: Verify spark exit code
         if: steps.spark-run.outputs.exit_code != 0
+        working-directory: rest-s3-tpcds
         run: |
           echo "❌ Spark container exited with code ${{ steps.spark-run.outputs.exit_code }}"
           docker compose logs spark-iceberg  # Show logs for debugging
