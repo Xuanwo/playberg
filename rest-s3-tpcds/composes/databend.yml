@@ -1,0 +1,24 @@
+services:
+  meta:
+    image: datafuselabs/databend-meta:v1.2.680
+    entrypoint: /databend-meta
+    command: --id 0 --single --grpc-api-advertise-host meta --raft-advertise-host meta --config-file /etc/databend/meta.toml
+    volumes:
+      - ./config/meta.toml:/etc/databend/meta.toml
+      - ./.meta:/mnt/data
+    networks:
+      - iceberg_net
+
+  query:
+    deploy:
+      replicas: 1
+    image: datafuselabs/databend-query:v1.2.700-nightly
+    depends_on:
+      - meta
+    command: databend-query -c /etc/databend-query/config.toml
+    volumes:
+      - ./config/query.toml:/etc/databend-query/config.toml
+    ports:
+      - "8000:8000"
+    networks:
+      - iceberg_net

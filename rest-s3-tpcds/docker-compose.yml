@@ -36,6 +36,28 @@ services:
     volumes:
       - ./configs/tabular_ingest/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./configs/tabular_ingest/generate_data.py:/opt/spark/scripts/generate_data.py
+  
+  meta:
+    extends:
+      file: composes/databend.yml
+      service: meta
+    volumes:
+      - ./configs/databend/meta.toml:/etc/databend/meta.toml
+      - ./.meta:/mnt/data
+
+  query:
+    extends:
+      file: composes/databend.yml
+      service: query
+    depends_on:
+      - meta
+      - minio
+      - mc
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./configs/databend/query.toml:/etc/databend-query/config.toml
+
   jupyter:
     extends:
       file: composes/jupyter.yml

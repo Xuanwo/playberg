@@ -1,2 +1,4 @@
 .ruff_cache
 rest-s3-tpcds/notebooks/.ipynb_checkpoints/
+.meta
+rest-s3-tpcds/.meta
