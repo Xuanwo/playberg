@@ -1,0 +1,65 @@
+# config/config.toml
+[query]
+tenant_id = "my-release"
+cluster_id = "example_cluster"
+management_mode = false
+jwt_key_file = ""
+max_active_sessions = 256
+shutdown_wait_timeout_ms = 5000
+
+# For flight rpc.
+flight_api_address = "0.0.0.0:9091"
+
+# Databend Query http address.
+# For admin RESET API.
+admin_api_address = "0.0.0.0:8080"
+
+# Databend Query metrics RESET API.
+metric_api_address = "0.0.0.0:7070"
+
+# Databend Query MySQL Handler.
+mysql_handler_host = "0.0.0.0"
+mysql_handler_port = 3307
+
+# Databend Query ClickHouse Handler.
+clickhouse_http_handler_host = "0.0.0.0"
+clickhouse_http_handler_port = 8124
+
+# Databend Query HTTP Handler.
+http_handler_host = "0.0.0.0"
+http_handler_port = 8000
+
+# Databend Query FlightSQL Handler.
+flight_sql_handler_host = "0.0.0.0"
+flight_sql_handler_port = 8900
+
+[[query.users]]
+name = "databend"
+auth_type = "double_sha1_password"
+auth_string = "3081f32caef285c232d066033c89a78d88a6d8a5"
+
+[query.settings]
+timezone = "UTC"
+
+[log.stderr]
+on = true
+format = "json"
+level = "WARN"
+
+[meta]
+endpoints = ["meta:9191"]
+username = "root"
+password = "root"
+client_timeout_in_second = 60
+auto_sync_interval = 60
+
+[storage]
+type = "s3"
+allow_insecure = false
+
+[storage.s3]
+bucket = "warehouse"
+enable_virtual_host_style = false
+endpoint_url = "http://minio.local:9000"
+access_key_id = "admin"
+secret_access_key = "password"

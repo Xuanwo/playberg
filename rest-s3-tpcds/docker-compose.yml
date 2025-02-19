@@ -1,94 +1,103 @@
 services:
   minio:
-    image: minio/minio
-    container_name: minio
-    hostname: minio.local
-    environment:
-      - MINIO_ROOT_USER=admin
-      - MINIO_ROOT_PASSWORD=password
-      - MINIO_DOMAIN=minio.local
-    networks:
-      iceberg_net:
-        aliases:
-          - warehouse.minio.local
+    extends:
+      file: composes/minio.yml
+      service: minio
     ports:
       - 9001:9001
       - 9000:9000
-    command: ["server", "/data", "--console-address", ":9001"]
+    environment: &aws-credentials
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: us-east-1
 
-  # Create the warehouse bucket in minio.
   mc:
-    depends_on:
-      - minio
-    image: minio/mc
-    container_name: mc
-    networks:
-      iceberg_net:
+    extends:
+      file: composes/minio.yml
+      service: mc
     environment:
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=password
-      - AWS_REGION=us-east-1
-    entrypoint: |
-      /bin/sh -c "
-      until (/usr/bin/mc config host add minio http://minio.local:9000 admin password) do echo '...waiting...' && sleep 1; done;
-      /usr/bin/mc mb minio/warehouse;
-      /usr/bin/mc policy set public minio/warehouse;
-      "
+      <<: *aws-credentials
 
   rest:
-    image: tabulario/iceberg-rest
-    container_name: iceberg-rest
-    hostname: rest.local
-    networks:
-      iceberg_net:
-    depends_on:
-      mc:
-        condition: service_completed_successfully
-    ports:
-      - 8181:8181
+    extends:
+      file: composes/tabular-rest.yml
+      service: rest
     environment:
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=password
-      - AWS_REGION=us-east-1
-      - CATALOG_WAREHOUSE=s3://warehouse/
-      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
-      - CATALOG_S3_ENDPOINT=http://minio.local:9000
+      <<: *aws-credentials
 
   spark-iceberg:
-    image: tabulario/spark-iceberg
-    container_name: spark-iceberg
-    entrypoint: |
-      /bin/sh -c '
-      cd /home/iceberg
-      pip install duckdb --upgrade
-      python /opt/spark/scripts/generate_data.py
-      '
-    networks:
-      iceberg_net:
+    extends:
+      file: composes/tabular-ingest.yml
+      service: spark-iceberg
+    environment:
+      <<: *aws-credentials
+      PYTHONUNBUFFERED: 1
     depends_on:
       - rest
+      - mc
+      - minio
     volumes:
-      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - ./generate_data.py:/opt/spark/scripts/generate_data.py
-    environment:
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=password
-      - AWS_REGION=us-east-1
-      # Disable python buffered stdout
-      - PYTHONUNBUFFERED=1
+      - ./configs/tabular_ingest/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - ./configs/tabular_ingest/generate_data.py:/opt/spark/scripts/generate_data.py
+  
+  meta:
+    extends:
+      file: composes/databend.yml
+      service: meta
+    volumes:
+      - ./configs/databend/meta.toml:/etc/databend/meta.toml
+
+  query:
+    extends:
+      file: composes/databend.yml
+      service: query
+    depends_on:
+      - meta
+      - minio
+      - mc
     ports:
-      - 8888:8888
-      # - 8080:8080
-      - 10000:10000
-      - 10001:10001
+      - "8000:8000"
+    volumes:
+      - ./configs/databend/query.toml:/etc/databend-query/config.toml
+
+
+  # optional catalog lakekeeper
+  lakekeeper:
+    extends:
+      file: composes/lakekeeper.yml
+      service: lakekeeper
+    ports:
+      - 8182:8181
+    depends_on:
+      - mc
+      - minio
+   
+  bootstrap:
+    extends:
+      file: composes/lakekeeper.yml
+      service: bootstrap
+  db:
+    extends:
+      file: composes/lakekeeper.yml
+      service: db
+  migrate:
+    extends:
+      file: composes/lakekeeper.yml
+      service: migrate
+
+  initiallakekeeperwarehouse:
+    extends:
+      file: composes/lakekeeper.yml
+      service: initiallakekeeperwarehouse
+    volumes:
+      - ./configs/lakekeeper/create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
+  
   jupyter:
-    image: quay.io/jupyter/pyspark-notebook:2024-06-04
-    command: start-notebook.sh --NotebookApp.token=''
+    extends:
+      file: composes/jupyter.yml
+      service: jupyter
     volumes:
       - ./notebooks:/home/jovyan/examples/
-    networks:
-      iceberg_net:
-    ports:
-      - "8889:8888"  
+
 networks:
-  iceberg_net:
+  iceberg_net: 

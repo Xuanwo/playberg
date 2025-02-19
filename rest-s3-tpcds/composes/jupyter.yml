@@ -1,0 +1,10 @@
+services:
+  jupyter:
+    image: quay.io/jupyter/pyspark-notebook:2024-06-04
+    command: start-notebook.sh --NotebookApp.token=''
+    volumes:
+      - ./notebooks:/home/jovyan/examples/
+    networks:
+      iceberg_net:
+    ports:
+      - "8889:8888"

@@ -1,0 +1,21 @@
+# config/meta.toml
+admin_api_address = "0.0.0.0:28002"
+grpc_api_address = "0.0.0.0:9191"
+
+[log]
+[log.stderr]
+  on = true
+  level = "ERROR"
+
+[log.file]
+  level = "INFO"
+  format = "json"
+  dir = "/mnt/data/log"
+
+[raft_config]
+  cluster_name = ""
+  raft_dir = "/mnt/data/raft"
+  raft_listen_host = "0.0.0.0"
+  raft_api_port = 28003
+  max_applied_log_to_keep = 10240
+  install_snapshot_timeout = 60000
