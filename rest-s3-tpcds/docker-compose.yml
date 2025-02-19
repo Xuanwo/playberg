@@ -3,6 +3,9 @@ services:
     extends:
       file: composes/minio.yml
       service: minio
+    ports:
+      - 9001:9001
+      - 9000:9000
     environment: &aws-credentials
       AWS_ACCESS_KEY_ID: admin
       AWS_SECRET_ACCESS_KEY: password
@@ -43,7 +46,6 @@ services:
       service: meta
     volumes:
       - ./configs/databend/meta.toml:/etc/databend/meta.toml
-      - ./.meta:/mnt/data
 
   query:
     extends:
@@ -58,6 +60,38 @@ services:
     volumes:
       - ./configs/databend/query.toml:/etc/databend-query/config.toml
 
+
+  # optional catalog lakekeeper
+  lakekeeper:
+    extends:
+      file: composes/lakekeeper.yml
+      service: lakekeeper
+    ports:
+      - 8182:8181
+    depends_on:
+      - mc
+      - minio
+   
+  bootstrap:
+    extends:
+      file: composes/lakekeeper.yml
+      service: bootstrap
+  db:
+    extends:
+      file: composes/lakekeeper.yml
+      service: db
+  migrate:
+    extends:
+      file: composes/lakekeeper.yml
+      service: migrate
+
+  initiallakekeeperwarehouse:
+    extends:
+      file: composes/lakekeeper.yml
+      service: initiallakekeeperwarehouse
+    volumes:
+      - ./configs/lakekeeper/create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
+  
   jupyter:
     extends:
       file: composes/jupyter.yml

@@ -5,7 +5,6 @@ services:
     command: --id 0 --single --grpc-api-advertise-host meta --raft-advertise-host meta --config-file /etc/databend/meta.toml
     volumes:
       - ./config/meta.toml:/etc/databend/meta.toml
-      - ./.meta:/mnt/data
     networks:
       - iceberg_net
 
