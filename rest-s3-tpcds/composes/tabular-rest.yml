@@ -1,0 +1,16 @@
+services:
+  rest:
+    image: tabulario/iceberg-rest
+    container_name: iceberg-rest
+    hostname: rest.local
+    networks:
+      iceberg_net:
+    depends_on:
+      mc:
+        condition: service_completed_successfully
+    ports:
+      - 8181:8181
+    environment:
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio.local:9000
